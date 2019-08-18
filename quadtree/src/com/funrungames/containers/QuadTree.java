@@ -1,4 +1,4 @@
-package com.funrungames.containers.quadtree;
+package com.funrungames.containers;
 
 import java.awt.Rectangle;
 import java.util.Iterator;
@@ -8,6 +8,19 @@ import java.util.NoSuchElementException;
 
 import javax.management.InvalidAttributeValueException;
 
+/**
+ * Information about quadtrees, see https://en.wikipedia.org/wiki/Quadtree
+ * 
+ * A Quadtree implementation. Each QuadTree contains 4 quadrants. Each quadrant may contain another QuadTree object, etc.
+ * A user constructs a QuadTree that by default has depth 0. This is typically the object the user is interfacing with.
+ * 
+ * This quadtree makes it possible to find a shape, do something with it, and then remove it almost in an instant.
+ * More info about this, see public QuadTree findShape(IShape s) and public boolean remove(IShape s, QuadTree t)
+ * 
+ *  
+ * @author bjornbon
+ *
+ */
 public class QuadTree  implements Iterable<IShape> {
 
 	/**
@@ -28,13 +41,13 @@ public class QuadTree  implements Iterable<IShape> {
     private Rectangle boudingBox;
     
     /**
-     * A shape is in this QuadTree element if it fits in.
-     * If the shape is not in shapes it may be in one of the childs where it fits in.
+     * A shape is stored in this QuadTree element if it fits within the boundig box of the QuadTree
+     * If the shape is not in shapes it may be in one of the sub-QuadTrees.
      */
     private List<IShape> shapes;  
     
     /**
-     * A QuadTree object can have up to 4 childs, for every quadrant of the boudingBox of the current QuadTree object.
+     * A QuadTree object can have up to 4 childs (I also call this sub-QuadTrees), for every quadrant of the boudingBox of the current QuadTree object.
      * 01
      * 23
      */
@@ -51,13 +64,30 @@ public class QuadTree  implements Iterable<IShape> {
     private int iterateState; // 0-3 search through childs, 4 search own shapes
     private Iterator<IShape> shapesIterator;
     
+    /**
+     * The total number of shapes in the QuadTree structure.
+     */
     private int aggregatedSize = 0; 
 
+    /**
+     * 
+     * @param maxDepth In my ujournals clustering software I choose a depth 6, but an optimal maxDepth is very use-case specific and heavily depends on the size of the boundingBox. See https://gamedev.stackexchange.com/questions/77432/how-should-i-choose-quadtree-depth
+     * @param boudingBox Speaks for itself.
+     * @throws InvalidAttributeValueException
+     */
     public QuadTree(int maxDepth, Rectangle boudingBox) throws InvalidAttributeValueException
     {
     	lInitQuadTree(maxDepth, boudingBox, 0, null);
     }
     
+    /**
+     * 
+     * @param maxDepth
+     * @param boudingBox
+     * @param depth The depth of this QuadTree
+     * @param parent All QuadTree objects have a parent except the one with dpeth 0.
+     * @throws InvalidAttributeValueException
+     */
     private QuadTree(int maxDepth, Rectangle boudingBox, int depth, QuadTree parent) throws InvalidAttributeValueException
     {
     	lInitQuadTree(maxDepth, boudingBox, depth, parent);
@@ -102,7 +132,7 @@ public class QuadTree  implements Iterable<IShape> {
      * 01
      * 23
      * 
-     * and a quadrant has a covered area the boudingBox.
+     * and a quadrant has a covered area represented by boudingBox.
      * 
      * @author bjornbon
      *
@@ -119,36 +149,37 @@ public class QuadTree  implements Iterable<IShape> {
     }
     
     /**
-     * In the current Quadrant and given a IShape s find a quadrant where the shape fits in.
+     * In the current Quadrant and given a IShape s find a sub-quadrant where the shape fits in.
      * 
      * @param s
-     * @return A quadrant modelled by an index and a boudingBox (area). If index == -1 it means that s does not fit in one of the quadrants.
+     * @return A sub-quadrant modelled by an index and a boudingBox (area). Returns null if s does not fit in one of the quadrants.
      */
     private Quadrant lFindChildIndexboudingBox(IShape s)
     {
-    	int quadrantIndex = -1;
-    	Rectangle newQuadrantboudingBox = null;
+    	Quadrant r = null;
     	
     	int x = (int)boudingBox.getX();
     	int y = (int)boudingBox.getY();
     	int w = (int)boudingBox.getWidth();
     	int h = (int)boudingBox.getHeight();
+    	
     	Rectangle[] quadrantLocations = new Rectangle[4];
     	quadrantLocations[0] = new Rectangle(x, y, w / 2, h / 2);
     	quadrantLocations[1] = new Rectangle(x + w/2, y, w - w / 2, h / 2);
     	quadrantLocations[2] = new Rectangle(x, y + h/2, w / 2, h - h / 2);
     	quadrantLocations[3] = new Rectangle(x + w/2, y + h/2, w - w / 2, h - h / 2);
+    	
     	Rectangle shapeLocation = s.getBoundingBox();
+    	
     	for (int i = 0; i < 4; i++)
     	{
     		if (quadrantLocations[i].contains(shapeLocation))
         	{
-        		quadrantIndex = i;
-        		newQuadrantboudingBox = quadrantLocations[i];
+        		r = new Quadrant(i, quadrantLocations[i]);
         		break;
         	}    		
     	}
-    	return new Quadrant(quadrantIndex, newQuadrantboudingBox);
+    	return r;
     }
     
     /**
@@ -162,7 +193,7 @@ public class QuadTree  implements Iterable<IShape> {
     	boolean inserted = false;
     	Quadrant ib = lFindChildIndexboudingBox(s);
 
-    	if (ib.index >= 0)
+    	if (ib != null)
     	{
     		if (childs[ib.index] == null)
     		{
@@ -174,6 +205,9 @@ public class QuadTree  implements Iterable<IShape> {
     	return inserted;
     }
     
+    /*
+     * This is one of the core features of any QuadTree: Move a shape a low as possible in the QuadTree structure.
+     */
     private void lMoveShapesToLowerLevel() throws Exception
     {
     	assert(childs != null): "child should be not null";
@@ -197,7 +231,7 @@ public class QuadTree  implements Iterable<IShape> {
     	
     	if (childs != null)
     	{
-    		// We're already in the state of having childs
+    		// We're already in the state of having child-QuadTrees
     		boolean inserted = lInsertToChild(s);
     		if (!inserted)
     		{
@@ -218,7 +252,7 @@ public class QuadTree  implements Iterable<IShape> {
     }
     
     /**
-     * Clean up childs if possible
+     * Clean up childs if possible. Typically called when a shape is removed.
      */
     private void lCleanChilds()
     {
@@ -241,6 +275,11 @@ public class QuadTree  implements Iterable<IShape> {
     	}
     }
     
+    /**
+     * Find a shape and remove it.
+     * @param s The shapes' equals method is used to determine whether a shape is found.
+     * @return
+     */
     public boolean remove(IShape s)
     {
     	QuadTree t = findShape(s);
@@ -255,7 +294,7 @@ public class QuadTree  implements Iterable<IShape> {
      * Removes a shape but only looks in t. 
      * This function is a lot faster than the remove with only s as parameter,
      * 
-     * @param s
+     * @param s The shapes' equals method is used to determine whether a shape is found.
      * @param t A QuadTree (sub)-object typically returned by findShape()
      * @return
      */
@@ -284,23 +323,24 @@ public class QuadTree  implements Iterable<IShape> {
     
     /**
      * 
-     * @param s
-     * @return null if not found else the QuadTree-node where it is found
+     * @param s The shapes' equals method is used to determine whether a shape is found.
+     * @return null if not found else the sub-QuadTree where the shape has been found. The return value can be input for the 
+     * remove(IShape s, QuadTree t) function to remove the found shape in an instant.
      */
     public QuadTree findShape(IShape s)
     {
     	QuadTree r = null;
     	if (childs != null)
     	{
-    		// first try to find shape at deepest level
+    		// first try to find shape at deepest level of QuadTree
     		Quadrant ib = lFindChildIndexboudingBox(s);
-    		if (ib.index >=0 && childs[ib.index] != null)
+    		if (ib != null && childs[ib.index] != null)
     		{
     			r = childs[ib.index].findShape(s);
     		}
     	}
     	
-    	// seconds if it is not at deeper level check shapes array at current level
+    	// seconds if it is not at a deeper level check shapes array at current level
     	if (r == null)
     	{
     		for (IShape s1: shapes)
@@ -315,6 +355,10 @@ public class QuadTree  implements Iterable<IShape> {
     	return r;
     }
     
+    /**
+     * Compute the total size of a QudTree by ieterating through the whole structure.
+     * @return
+     */
     public int sizeSlow()
     {
     	int size = shapes.size();

@@ -1,4 +1,4 @@
-package com.funrungames.containers.quadtree;
+package com.funrungames.containers;
 
 import java.awt.Rectangle;
 
