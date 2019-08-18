@@ -9,17 +9,20 @@ import java.util.NoSuchElementException;
 import javax.management.InvalidAttributeValueException;
 
 /**
- * Information about quadtrees, see https://en.wikipedia.org/wiki/Quadtree
  * 
- * A Quadtree implementation. Each QuadTree contains 4 quadrants. Each quadrant may contain another QuadTree object, etc.
- * A user constructs a QuadTree that by default has depth 0. This is typically the object the user is interfacing with.
+ * @author bjornbon
+ * 
+ * Information about Quadtrees, see https://en.wikipedia.org/wiki/Quadtree
+ * 
+ * This is a Quadtree implementation. Each QuadTree contains 4 quadrants. Each quadrant may contain another QuadTree object, etc.
+ * So a quadtree is actually created by a tree of QuadTree objects.
+ * A user constructs a QuadTree that has depth 0 by default. This is typically the object the user is interfacing with.
  * 
  * This quadtree makes it possible to find a shape, do something with it, and then remove it almost in an instant.
- * More info about this, see public QuadTree findShape(IShape s) and public boolean remove(IShape s, QuadTree t)
+ * More info about this, see the functions:
+ * public QuadTree findShape(IShape s) 
+ * public boolean remove(IShape s, QuadTree t)
  * 
- *  
- * @author bjornbon
- *
  */
 public class QuadTree  implements Iterable<IShape> {
 
@@ -59,7 +62,7 @@ public class QuadTree  implements Iterable<IShape> {
     private QuadTree parent;
     
     /**
-     * Used for iteration
+     * States that are used during iteration
      */
     private int iterateState; // 0-3 search through childs, 4 search own shapes
     private Iterator<IShape> shapesIterator;
@@ -71,9 +74,13 @@ public class QuadTree  implements Iterable<IShape> {
 
     /**
      * 
-     * @param maxDepth In my ujournals clustering software I choose a depth 6, but an optimal maxDepth is very use-case specific and heavily depends on the size of the boundingBox. See https://gamedev.stackexchange.com/questions/77432/how-should-i-choose-quadtree-depth
+     * @param maxDepth In my ujournals clustering software I choose a depth 6, but an optimal maxDepth is 
+     *                 very use-case specific and heavily depends on the size of the boundingBox. 
+     *                 See https://gamedev.stackexchange.com/questions/77432/how-should-i-choose-quadtree-depth
      * @param boudingBox Speaks for itself.
      * @throws InvalidAttributeValueException
+     * 
+     * Note: Some functions use recursion. A very large maxDepth (say > 100) may cause issues then.
      */
     public QuadTree(int maxDepth, Rectangle boudingBox) throws InvalidAttributeValueException
     {
@@ -225,6 +232,11 @@ public class QuadTree  implements Iterable<IShape> {
     	}
     }
     
+    /**
+     * Inserting a shape in the QuadTree
+     * @param s The shape to insert
+     * @throws Exception
+     */
     public void insert(IShape s) throws Exception
     {
     	if (!this.boudingBox.contains(s.getBoundingBox())) throw new Exception("Out of boudingBox"); 
@@ -291,11 +303,11 @@ public class QuadTree  implements Iterable<IShape> {
     }
     
     /**
-     * Removes a shape but only looks in t. 
+     * Removes a shape but only looks in QuadTree t. SO no iteration through the whole tree.
      * This function is a lot faster than the remove with only s as parameter,
      * 
      * @param s The shapes' equals method is used to determine whether a shape is found.
-     * @param t A QuadTree (sub)-object typically returned by findShape()
+     * @param t A QuadTree (sub)-object (typically returned by findShape())
      * @return
      */
     public boolean remove(IShape s, QuadTree t)
@@ -356,8 +368,9 @@ public class QuadTree  implements Iterable<IShape> {
     }
     
     /**
-     * Compute the total size of a QudTree by ieterating through the whole structure.
-     * @return
+     * Compute the total size of a QudTree by iterating through the whole structure.
+     * Mainly meant for testing
+     * @return Number of shapes in the QuadTree.
      */
     public int sizeSlow()
     {
@@ -375,18 +388,28 @@ public class QuadTree  implements Iterable<IShape> {
     	return size;
     }
     
+    /**
+     * 
+     * @return Number of shapes in the QuadTree.
+     */
     public int size()
     {
     	return aggregatedSize;
     }
     
-    private void getIntersectingShapes(List<IShape> oshapes, IShape refShape)
+    /**
+     * Search for interseting shapes in this QuadTree and its childs.
+     * 
+     * @param intersectingShapes output list containing the intersecting shapes.
+     * @param refShape
+     */
+    private void getIntersectingShapes(List<IShape> intersectingShapes, IShape refShape)
     {
     	for (IShape shape: shapes)
     	{
     		if (shape.getBoundingBox().intersects(refShape.getBoundingBox()))
     		{
-    			oshapes.add(shape);
+    			intersectingShapes.add(shape);
     		}
     	}
     	if (childs != null)
@@ -395,7 +418,7 @@ public class QuadTree  implements Iterable<IShape> {
     		{
     			if (childs[i] != null && childs[i].boudingBox.intersects(refShape.getBoundingBox()))
     			{
-    				childs[i].getIntersectingShapes(oshapes, refShape);
+    				childs[i].getIntersectingShapes(intersectingShapes, refShape);
     			}
     		}
     	}
@@ -409,9 +432,9 @@ public class QuadTree  implements Iterable<IShape> {
      */
     public List<IShape> getIntersectingShapes(IShape refShape)
     {
-    	List<IShape> oshapes = new LinkedList<IShape>();
-    	getIntersectingShapes(oshapes, refShape);
-    	return oshapes;
+    	List<IShape> intersetingShapes = new LinkedList<IShape>();
+    	getIntersectingShapes(intersetingShapes, refShape);
+    	return intersetingShapes;
     }
     
     class QuadTreeIterator implements Iterator<IShape>
@@ -424,6 +447,10 @@ public class QuadTree  implements Iterable<IShape> {
     		qt.iterateState = 0;
     	}
     	
+    	/**
+    	 * Iterating is done by first iterating through the sub-SquadTrees (the childs),
+    	 * after that iterate through the list of shapes of this QuadTree.
+    	 */
 		@Override
 		public boolean hasNext() 
 		{
@@ -495,7 +522,7 @@ public class QuadTree  implements Iterable<IShape> {
 		{
 			throw new UnsupportedOperationException();
 		}
-    	
+
     }
 
 	@Override
