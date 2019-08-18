@@ -1,4 +1,4 @@
-# quadtree
+# Quadtree
 
 A QuadTree implemented in Java.
 
@@ -13,5 +13,5 @@ More info about this, see the functions:
 - public QuadTree findShape(IShape s) 
 - public boolean remove(IShape s, QuadTree t)
 
-# building
+# Building
 Copy paste the files into your java project and use freely.
